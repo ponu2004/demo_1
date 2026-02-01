@@ -1,0 +1,55 @@
+@Library('sharelib@main') _
+pipeline {
+     agent {
+    label 'ssh'
+  }
+  parameters {
+  booleanParam defaultValue: true, name: 'param1'
+  choice choices: ['YES', 'NO'], name: 'param2'
+}
+     environment {
+     def maven =  tool "maven"
+     def sonarScanner = tool "sonarcube"
+}
+    stages {
+        stage('git checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/doitomkar123/java-hello-world'
+            }
+        }
+        stage('Sonar Scan'){
+            when{
+                expression{ params.param1 == true && params.param2 == 'YES'}
+            }
+            steps{
+                withSonarQubeEnv('sonar'){
+                    sh "${sonarScanner}/bin/sonar-scanner -Dsonar.projectKey=java -Dsonar.projectName=java -Dsonar.java.binaries=."
+                }
+                }
+            }
+        stage('Maven Build & test'){
+            steps{
+                //sh "${maven}/bin/mvn clean package"
+                mydir()
+            }
+            }
+        stage('Deploy application'){
+            steps{
+                sh '''
+                export BUILD_ID=dontKillMe
+                export JENKINS_NODE_COOKIE=dontKillMe
+                bash run.sh
+                '''
+            }
+            }
+        }
+        post{
+            always{
+                publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, icon: '', keepAll: false, reportDir: 'target/site/jacoco', reportFiles: 'index.html', reportName: 'code coverage', reportTitles: '', useWrapperFileDirectly: true])
+                junit 'target/surefire-reports/*.xml'
+                
+                mail bcc: '', body: 'hello', cc: '', from: '', replyTo: '', subject: 'xyz', to: 'sangleprajakta30@gmail.com'
+            }
+            }
+    }
+
